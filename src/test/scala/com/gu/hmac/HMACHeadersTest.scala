@@ -11,6 +11,10 @@ class HMACHeadersTest extends FlatSpec with Matchers {
     override def secret = "secret"
   }
 
+  val wrongHmacHeader = new HMACHeaders {
+    override def secret = "wrong"
+  }
+
   val uri = new URI("http:///www.theguardian.com/signin?query=someData")
   val date = new DateTime(1994, 11, 15, 8, 12)
   val expectedHMAC = hmacHeader.sign(date, uri)
@@ -54,6 +58,11 @@ class HMACHeadersTest extends FlatSpec with Matchers {
   it should "return false if the two URIs do not match" in {
     val wrongUri = new URI("http:///www.theguardian.com/other")
     hmacHeader.isHMACValid(HMACDate(date), wrongUri, HMACToken(expectedHMAC)) should be(false)
+  }
+
+  it should "return false if the two secrets do not match" in {
+    val wrongHMAC = wrongHmacHeader.sign(date, uri)
+    hmacHeader.isHMACValid(HMACDate(date), uri, HMACToken(wrongHMAC)) should be(false)
   }
 
   "isDateValid" should "return true if the date is within the expected time frame" in {
