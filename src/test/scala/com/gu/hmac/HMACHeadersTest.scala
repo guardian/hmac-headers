@@ -51,18 +51,23 @@ class HMACHeadersTest extends FlatSpec with Matchers {
     hmacHeader.isHMACValid(HMACDate(wrongDate), uri, HMACToken(expectedHMAC)) should be(false)
   }
 
-  it should "return false if the two uris do not match" in {
+  it should "return false if the two URIs do not match" in {
     val wrongUri = new URI("http:///www.theguardian.com/other")
     hmacHeader.isHMACValid(HMACDate(date), wrongUri, HMACToken(expectedHMAC)) should be(false)
   }
 
-  "isDateValid" should "return true if the date is within expected time frame" in {
+  "isDateValid" should "return true if the date is within the expected time frame" in {
     val threeMinutesAgo = DateTime.now.minusMinutes(3)
     hmacHeader.isDateValid(HMACDate(threeMinutesAgo)) should be(true)
   }
 
-  it should "return false if the date is outside expected time frame" in {
+  it should "return false if the date is outside the expected time frame" in {
     val sixMinutesAgo = DateTime.now.minusMinutes(6)
     hmacHeader.isDateValid(HMACDate(sixMinutesAgo)) should be(false)
+  }
+
+  it should "return false if the date is in the future" in {
+    val inThreeMinutes = DateTime.now.plusMinutes(6)
+    hmacHeader.isDateValid(HMACDate(inThreeMinutes)) should be(false)
   }
 }
