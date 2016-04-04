@@ -77,8 +77,8 @@ trait HMACHeaders {
     createHMACHeaderValues(uri, now)
   }
 
-  def createHMACHeaderValues(path: URI, now: DateTime): HMACHeaderValues = {
-    val hmacValue = sign(now, path)
+  def createHMACHeaderValues(uri: URI, now: DateTime): HMACHeaderValues = {
+    val hmacValue = sign(now, uri)
     HMACHeaderValues(date = now.toRfc7231String, token = hmacValue.toHeaderValue)
   }
 

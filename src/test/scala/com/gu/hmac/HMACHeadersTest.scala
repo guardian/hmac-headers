@@ -11,7 +11,7 @@ class HMACHeadersTest extends FlatSpec with Matchers {
     override def secret = "secret"
   }
 
-  val uri = new URI("http:///www.theguardian.com/signin")
+  val uri = new URI("http:///www.theguardian.com/signin?query=someData")
   val date = new DateTime(1994, 11, 15, 8, 12)
   val expectedHMAC = hmacHeader.sign(date, uri)
   val dateHeaderValue = "Tue, 15 Nov 1994 08:12:00 GMT"
