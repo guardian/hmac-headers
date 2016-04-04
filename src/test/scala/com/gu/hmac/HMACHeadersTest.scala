@@ -6,6 +6,7 @@ import org.joda.time.DateTime
 import org.scalatest.{FlatSpec, Matchers}
 
 class HMACHeadersTest extends FlatSpec with Matchers {
+  import HMACDate.DateTimeOps
   val hmacHeader = new HMACHeaders {
     override def secret = "secret"
   }
@@ -17,15 +18,14 @@ class HMACHeadersTest extends FlatSpec with Matchers {
 
   "createHMACHeaderValues" should "create a Date and Authorization token base on a URI and a secret" in {
     val headers = hmacHeader.createHMACHeaderValues(uri, date)
-    headers("Date") should be(dateHeaderValue)
-    headers("Token") should be(s"HMAC $expectedHMAC")
+    headers.date should be(dateHeaderValue)
+    headers.token should be(s"HMAC $expectedHMAC")
   }
 
   "validateHMACHeaders" should "return true if the HMAC and the date are valid" in {
     val now = DateTime.now()
-    val nowAsRfc7231 = HMACDate.toString(now)
     val hmac = hmacHeader.sign(now, uri)
-    hmacHeader.validateHMACHeaders(nowAsRfc7231, s"HMAC $hmac", uri) should be(true)
+    hmacHeader.validateHMACHeaders(now.toRfc7231String, s"HMAC $hmac", uri) should be(true)
   }
 
   it should "raise an exception if the Date header is in the wrong format" in {

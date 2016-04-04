@@ -10,11 +10,12 @@ import scala.util.{Failure, Success, Try}
 import org.joda.time.{DateTimeZone, DateTime}
 import org.apache.commons.codec.binary.Base64
 
-sealed trait HMACError
-case class HMACInvalidTokenError(message: String) extends NoStackTrace
-case class HMACInvalidDateError(message: String) extends NoStackTrace
+sealed trait HMACError extends NoStackTrace
+case class HMACInvalidTokenError(message: String) extends HMACError
+case class HMACInvalidDateError(message: String) extends HMACError
 
 case class HMACToken(value: String)
+
 
 object HMACToken {
   private val HmacPattern = "HMAC\\s(.+)".r
@@ -25,14 +26,16 @@ object HMACToken {
       case _ => throw new HMACInvalidTokenError(s"Invalid token header, should be of format $HmacPattern")
     }
 
-  def toHeaderValue(hmacValue: String) = s"HMAC $hmacValue"
+  implicit class TokenOps(hmacValue: String) {
+    def toHeaderValue: String = s"HMAC $hmacValue"
+  }
 }
 
 case class HMACDate(value: DateTime)
 
 object HMACDate {
   def get(dateHeader: String): HMACDate = {
-    Try(toDateTime(dateHeader)) match {
+    Try(dateHeader.fromRfc7231String) match {
       case Success(dateTime) => HMACDate(dateTime)
       case Failure(e) => throw new HMACInvalidDateError("Invalid Date Format: " + e.getMessage)
     }
@@ -41,11 +44,22 @@ object HMACDate {
   // http://tools.ietf.org/html/rfc7231#section-7.1.1.2
   private val HTTPDateFormat = DateTimeFormat.forPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'").withZone(DateTimeZone.forID("GMT"))
 
-  def toString(dateTime: DateTime): String = dateTime.withZone(DateTimeZone.forID("GMT")).toString(HTTPDateFormat)
-  def toDateTime(date: String): DateTime = HTTPDateFormat.parseDateTime(date)
+  implicit class DateTimeOps(dateTime: DateTime) {
+    def toRfc7231String: String =
+      dateTime.withZone(DateTimeZone.forID("GMT")).toString(HTTPDateFormat)
+  }
+
+  implicit class DateStrOps(date: String) {
+    def fromRfc7231String: DateTime = HTTPDateFormat.parseDateTime(date)
+  }
 }
 
+case class HMACHeaderValues(date: String, token: String)
+
 trait HMACHeaders {
+  import HMACDate.DateTimeOps
+  import HMACToken.TokenOps
+
   def secret: String
 
   private val Algorithm = "HmacSHA256"
@@ -58,15 +72,14 @@ trait HMACHeaders {
     isDateValid(hmacDate) && isHMACValid(hmacDate, uri, hmacToken)
   }
 
-  def createHMACHeaderValues(uri: URI): Map[String, String] = {
+  def createHMACHeaderValues(uri: URI): HMACHeaderValues = {
     val now = DateTime.now()
     createHMACHeaderValues(uri, now)
   }
 
-  def createHMACHeaderValues(path: URI, now: DateTime): Map[String, String] = {
-    val dateAsRfc7231 = HMACDate.toString(now)
+  def createHMACHeaderValues(path: URI, now: DateTime): HMACHeaderValues = {
     val hmacValue = sign(now, path)
-    Map("Date" -> dateAsRfc7231, "Token" -> HMACToken.toHeaderValue(hmacValue))
+    HMACHeaderValues(date = now.toRfc7231String, token = hmacValue.toHeaderValue)
   }
 
   private[hmac] def isHMACValid(date: HMACDate, uri: URI, hmac: HMACToken): Boolean = {
@@ -81,8 +94,7 @@ trait HMACHeaders {
   }
 
   private[hmac] def sign(date: DateTime, uri: URI): String = {
-    val dateAsRfc7231 = HMACDate.toString(date)
-    val input = List[String](dateAsRfc7231, uri.getPath)
+    val input = List[String](date.toRfc7231String, uri.getPath)
     val toSign = input.mkString("\n")
     calculateHMAC(toSign)
   }
@@ -96,4 +108,3 @@ trait HMACHeaders {
   }
 
 }
-
