@@ -1,0 +1,68 @@
+package com.gu.hmac
+
+import java.net.URI
+
+import org.joda.time.DateTime
+import org.scalatest.{FlatSpec, Matchers}
+
+class HMACHeadersTest extends FlatSpec with Matchers {
+  val hmacHeader = new HMACHeaders {
+    override def secret = "secret"
+  }
+
+  val uri = new URI("http:///www.theguardian.com/signin")
+  val date = new DateTime(1994, 11, 15, 8, 12)
+  val expectedHMAC = hmacHeader.sign(date, uri)
+  val dateHeaderValue = "Tue, 15 Nov 1994 08:12:00 GMT"
+
+  "createHMACHeaderValues" should "create a Date and Authorization token base on a URI and a secret" in {
+    val headers = hmacHeader.createHMACHeaderValues(uri, date)
+    headers("Date") should be(dateHeaderValue)
+    headers("Token") should be(s"HMAC $expectedHMAC")
+  }
+
+  "validateHMACHeaders" should "return true if the HMAC and the date are valid" in {
+    val now = DateTime.now()
+    val nowAsRfc7231 = HMACDate.toString(now)
+    val hmac = hmacHeader.sign(now, uri)
+    hmacHeader.validateHMACHeaders(nowAsRfc7231, s"HMAC $hmac", uri) should be(true)
+  }
+
+  it should "raise an exception if the Date header is in the wrong format" in {
+    val wrongDateHeaderFormat = "Tu, 15 Nov 1994 08:12:00 GMT"
+    intercept[HMACInvalidDateError] {
+      hmacHeader.validateHMACHeaders(wrongDateHeaderFormat, expectedHMAC, uri)
+    }
+  }
+
+  it should "raise an exception if the HMAC header is in the wrong format" in {
+    val wrongTokenHeaderFormat = "abcdef"
+    intercept[HMACInvalidTokenError] {
+      hmacHeader.validateHMACHeaders(dateHeaderValue, wrongTokenHeaderFormat, uri) should be(true)
+    }
+  }
+
+  "isHMACValid" should "return true if the two hmac signatures match" in {
+    hmacHeader.isHMACValid(HMACDate(date), uri, HMACToken(expectedHMAC)) should be(true)
+  }
+
+  it should "return false if the two dates do not match" in {
+    val wrongDate = new DateTime(1993, 11, 15, 8, 12)
+    hmacHeader.isHMACValid(HMACDate(wrongDate), uri, HMACToken(expectedHMAC)) should be(false)
+  }
+
+  it should "return false if the two uris do not match" in {
+    val wrongUri = new URI("http:///www.theguardian.com/other")
+    hmacHeader.isHMACValid(HMACDate(date), wrongUri, HMACToken(expectedHMAC)) should be(false)
+  }
+
+  "isDateValid" should "return true if the date is within expected time frame" in {
+    val threeMinutesAgo = DateTime.now.minusMinutes(3)
+    hmacHeader.isDateValid(HMACDate(threeMinutesAgo)) should be(true)
+  }
+
+  it should "return false if the date is outside expected time frame" in {
+    val sixMinutesAgo = DateTime.now.minusMinutes(6)
+    hmacHeader.isDateValid(HMACDate(sixMinutesAgo)) should be(false)
+  }
+}
