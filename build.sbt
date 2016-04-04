@@ -1,3 +1,6 @@
+import sbtrelease._
+import ReleaseTransformations._
+
 name := "hmac-headers"
 
 version := "1.0"
