@@ -71,7 +71,10 @@ trait HMACHeaders extends LazyLogging {
     val hmacDate = HMACDate.get(dateHeader)
     val hmacToken = HMACToken.get(authorizationHeader)
     logger.debug(s"Validate HMAC headers: dateHeader = $dateHeader, authorizationHeader = $authorizationHeader")
-    isDateValid(hmacDate) && isHMACValid(hmacDate, uri, hmacToken)
+    val dateValid: Boolean = isDateValid(hmacDate)
+    val hmacValid: Boolean = isHMACValid(hmacDate, uri, hmacToken)
+    logger.debug(s"isDateValid = $dateValid, isHMACValid = $hmacValid")
+    dateValid && hmacValid
   }
 
   def createHMACHeaderValues(uri: URI): HMACHeaderValues = {
