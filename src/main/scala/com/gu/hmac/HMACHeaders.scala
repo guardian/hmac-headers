@@ -3,6 +3,7 @@ package com.gu.hmac
 import java.net.URI
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
+import com.typesafe.scalalogging.LazyLogging
 import org.joda.time.format.DateTimeFormat
 
 import scala.util.control.NoStackTrace
@@ -56,7 +57,7 @@ object HMACDate {
 
 case class HMACHeaderValues(date: String, token: String)
 
-trait HMACHeaders {
+trait HMACHeaders extends LazyLogging {
   import HMACDate.DateTimeOps
   import HMACToken.TokenOps
 
@@ -69,6 +70,7 @@ trait HMACHeaders {
   def validateHMACHeaders(dateHeader: String, authorizationHeader: String, uri: URI): Boolean = {
     val hmacDate = HMACDate.get(dateHeader)
     val hmacToken = HMACToken.get(authorizationHeader)
+    logger.debug(s"Validate HMAC headers: dateHeader = $dateHeader, authorizationHeader = $authorizationHeader")
     isDateValid(hmacDate) && isHMACValid(hmacDate, uri, hmacToken)
   }
 
@@ -89,14 +91,19 @@ trait HMACHeaders {
   private[hmac] def isDateValid(date: HMACDate): Boolean  = {
     val now = DateTime.now(DateTimeZone.forID("GMT"))
     val delta = Math.abs(date.value.getMillis - now.getMillis)
+    logger.debug(s"Delta is $delta")
     val allowedOffset = HmacValidDurationInMinutes * MinuteInMilliseconds
+    logger.debug(s"Allowed offset is $allowedOffset")
     delta <= allowedOffset
   }
 
   private[hmac] def sign(date: DateTime, uri: URI): String = {
     val input = List[String](date.toRfc7231String, uri.getPath)
     val toSign = input.mkString("\n")
-    calculateHMAC(toSign)
+    logger.debug(s"Creating signature for: $toSign")
+    val hmacSignature = calculateHMAC(toSign)
+    logger.debug(s"HMAC signature is $hmacSignature")
+    hmacSignature
   }
 
   private[hmac] def calculateHMAC(toEncode: String): String = {
