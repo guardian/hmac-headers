@@ -3,13 +3,15 @@ package com.gu.hmac
 import java.net.URI
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
+
 import com.typesafe.scalalogging.LazyLogging
+import org.apache.commons.codec.binary.Base64
+import org.apache.commons.codec.digest.DigestUtils
 import org.joda.time.format.DateTimeFormat
+import org.joda.time.{DateTime, DateTimeZone}
 
 import scala.util.control.NoStackTrace
 import scala.util.{Failure, Success, Try}
-import org.joda.time.{DateTimeZone, DateTime}
-import org.apache.commons.codec.binary.Base64
 
 sealed trait HMACError extends NoStackTrace
 case class HMACInvalidTokenError(message: String) extends HMACError
@@ -80,6 +82,22 @@ trait HMACHeaders extends LazyLogging {
   def createHMACHeaderValues(uri: URI): HMACHeaderValues = {
     val now = DateTime.now()
     createHMACHeaderValues(uri, now)
+  }
+
+  private[hmac] def md5(content: Option[String]): String = {
+    content match {
+      case Some(c) => {
+        logger.debug(s"Creating signature for: $content")
+        val digest = DigestUtils.md5(c)
+        val base64md5 = new String(Base64.encodeBase64(digest))
+        logger.debug(s"Base64 encoded MD5 is $base64md5")
+        base64md5
+      }
+      case None => {
+        logger.debug("Empty content; returning empty string")
+        ""
+      }
+    }
   }
 
   private[hmac] def createHMACHeaderValues(uri: URI, now: DateTime): HMACHeaderValues = {
