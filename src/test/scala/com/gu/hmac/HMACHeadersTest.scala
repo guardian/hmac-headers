@@ -19,45 +19,87 @@ class HMACHeadersTest extends FlatSpec with Matchers {
 
   val uri = new URI("http:///www.theguardian.com/signin?query=someData")
   val date = new DateTime(1994, 11, 15, 8, 12)
-  val expectedHMAC = hmacHeader.sign(date, uri)
+
+  val hmacRequest = HMACRequest(
+    httpVerb = HTTP.GET,
+    date = HMACDate(date),
+    uri = uri,
+    additionalHeaders = None,
+    contentType = None,
+    contentMd5 = ""
+  )
+
+
+  val expectedHMAC = hmacHeader.sign(hmacRequest)
   val dateHeaderValue = "Tue, 15 Nov 1994 08:12:00 GMT"
 
   "createHMACHeaderValues" should "create a Date and Authorization token base on a URI and a secret" in {
-    val headers = hmacHeader.createHMACHeaderValues(uri, date)
+    val headers = hmacHeader.createHMACHeaderValues(hmacRequest)
     headers.date should be(dateHeaderValue)
-    headers.token should be(s"HMAC $expectedHMAC")
+    headers.token should be(expectedHMAC)
   }
 
   "validateHMACHeaders" should "return true if the HMAC and the date are valid" in {
     val now = DateTime.now()
-    val hmac = hmacHeader.sign(now, uri)
-    hmacHeader.validateHMACHeaders(now.toRfc7231String, s"HMAC $hmac", uri) should be(true)
+    val validHmacRequest = HMACRequest(
+      httpVerb = hmacRequest.httpVerb,
+      date = HMACDate(now),
+      uri = hmacRequest.uri,
+      additionalHeaders = hmacRequest.additionalHeaders,
+      contentType = hmacRequest.contentType,
+      contentMd5 = hmacRequest.contentMd5
+    )
+    val hmac = hmacHeader.sign(validHmacRequest)
+    val isHmacValid = hmacHeader.validateHMACHeaders(
+      httpVerb = validHmacRequest.httpVerb,
+      date = validHmacRequest.date,
+      uri = validHmacRequest.uri)(HMACToken(hmac))
+    isHmacValid should be(true)
   }
 
   it should "raise an exception if the Date header is in the wrong format" in {
     val wrongDateHeaderFormat = "Tu, 15 Nov 1994 08:12:00 GMT"
     intercept[HMACInvalidDateError] {
-      hmacHeader.validateHMACHeaders(wrongDateHeaderFormat, expectedHMAC, uri)
+      hmacHeader.validateHMACHeaders(
+        httpVerb = HTTP.GET,
+        date = HMACDate(wrongDateHeaderFormat),
+        uri = uri)(HMACToken(expectedHMAC))
     }
   }
 
   "isHMACValid" should "return true if the two hmac signatures match" in {
-    hmacHeader.isHMACValid(HMACDate(date), uri, HMACToken(expectedHMAC)) should be(true)
+    hmacHeader.isHMACValid(hmacRequest, HMACToken(expectedHMAC)) should be(true)
   }
 
   it should "return false if the two dates do not match" in {
     val wrongDate = new DateTime(1993, 11, 15, 8, 12)
-    hmacHeader.isHMACValid(HMACDate(wrongDate), uri, HMACToken(expectedHMAC)) should be(false)
+    val hmacRequestWithWrongDate = HMACRequest(
+      httpVerb = hmacRequest.httpVerb,
+      date = HMACDate(wrongDate),
+      uri = hmacRequest.uri,
+      additionalHeaders = hmacRequest.additionalHeaders,
+      contentType = hmacRequest.contentType,
+      contentMd5 = hmacRequest.contentMd5
+    )
+    hmacHeader.isHMACValid(hmacRequestWithWrongDate, HMACToken(expectedHMAC)) should be(false)
   }
 
   it should "return false if the two URIs do not match" in {
     val wrongUri = new URI("http:///www.theguardian.com/other")
-    hmacHeader.isHMACValid(HMACDate(date), wrongUri, HMACToken(expectedHMAC)) should be(false)
+    val hmacRequestWithWrongUri = HMACRequest(
+      httpVerb = hmacRequest.httpVerb,
+      date = hmacRequest.date,
+      uri = wrongUri,
+      additionalHeaders = hmacRequest.additionalHeaders,
+      contentType = hmacRequest.contentType,
+      contentMd5 = hmacRequest.contentMd5
+    )
+    hmacHeader.isHMACValid(hmacRequestWithWrongUri, HMACToken(expectedHMAC)) should be(false)
   }
 
   it should "return false if the two secrets do not match" in {
-    val wrongHMAC = wrongHmacHeader.sign(date, uri)
-    hmacHeader.isHMACValid(HMACDate(date), uri, HMACToken(wrongHMAC)) should be(false)
+    val wrongHMAC = wrongHmacHeader.sign(hmacRequest)
+    hmacHeader.isHMACValid(hmacRequest, HMACToken(wrongHMAC)) should be(false)
   }
 
   "isDateValid" should "return true if the date is within the expected time frame" in {

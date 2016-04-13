@@ -34,10 +34,6 @@ object HMACToken {
       case HmacPattern(token) => new HMACToken(token)
       case token => new HMACToken(token)
     }
-
-  implicit class TokenOps(hmacValue: String) {
-    def toHeaderValue: String = s"HMAC $hmacValue"
-  }
 }
 
 class HMACDate(val value: DateTime)
@@ -71,6 +67,10 @@ class HMACContentType(val value: String)
 
 object HMACContentType {
   def apply(contentTypeHeader: String): HMACContentType = new HMACContentType(contentTypeHeader.toLowerCase)
+
+  implicit class ContentTypeStrOps(contentTypeOpt: Option[HMACContentType]) {
+    def toStringValue: String = contentTypeOpt.map(_.value).getOrElse("")
+  }
 }
 class HMACAdditionalHeaders(val value: String)
 
@@ -89,13 +89,37 @@ object HMACAdditionalHeaders {
     }.mkString("\n")
     new HMACAdditionalHeaders(canonicalisedHeaders)
   }
+
+  implicit class AdditionalHeadersStrOps(additionalHeadersOpt: Option[HMACAdditionalHeaders]) {
+    def toStringValue: String = additionalHeadersOpt.map(_.value).getOrElse("")
+  }
+}
+
+case class HMACRequest(httpVerb: HTTP.Verb,
+                       date: HMACDate,
+                       uri: URI,
+                       additionalHeaders: Option[HMACAdditionalHeaders] = None,
+                       contentType: Option[HMACContentType] = None,
+                       contentMd5: String = "") {
+  import HMACDate.DateTimeOps
+
+  override def toString = {
+    val values = Seq(
+      httpVerb.toString,
+      contentMd5,
+      contentType.toStringValue,
+      date.value.toRfc7231String,
+      uri.getPath,
+      additionalHeaders
+    )
+    values.mkString("\n")
+  }
 }
 
 case class HMACHeaderValues(date: String, token: String)
 
 trait HMACHeaders extends LazyLogging {
   import HMACDate.DateTimeOps
-  import HMACToken.TokenOps
 
   def secret: String
 
@@ -104,19 +128,46 @@ trait HMACHeaders extends LazyLogging {
   private val MinuteInMilliseconds = 60000
   private val UTF8Charset = StandardCharsets.UTF_8
 
-  def validateHMACHeaders(dateHeader: String, authorizationHeader: String, uri: URI): Boolean = {
-    val hmacDate = HMACDate(dateHeader)
-    val hmacToken = HMACToken(authorizationHeader)
-    logger.debug(s"Validate HMAC headers: dateHeader = $dateHeader, authorizationHeader = $authorizationHeader")
-    val dateValid: Boolean = isDateValid(hmacDate)
-    val hmacValid: Boolean = isHMACValid(hmacDate, uri, hmacToken)
+  def validateHMACHeaders(
+                           httpVerb: HTTP.Verb,
+                           date: HMACDate,
+                           uri: URI,
+                           additionalHeaders: Option[HMACAdditionalHeaders] = None,
+                           contentType: Option[HMACContentType] = None,
+                           content: Option[String] = None
+                         )(token: HMACToken): Boolean = {
+    val contentMd5 = md5(content)
+    val hmacRequest = HMACRequest(
+      httpVerb,
+      date,
+      uri,
+      additionalHeaders,
+      contentType,
+      contentMd5
+    )
+    logger.debug(s"Validate HMAC request: ${hmacRequest.toString}")
+    val dateValid: Boolean = isDateValid(hmacRequest.date)
+    val hmacValid: Boolean = isHMACValid(hmacRequest, token)
     logger.debug(s"isDateValid = $dateValid, isHMACValid = $hmacValid")
     dateValid && hmacValid
   }
 
-  def createHMACHeaderValues(uri: URI): HMACHeaderValues = {
+  def createHMACHeaderValues(httpVerb: HTTP.Verb,
+                             uri: URI,
+                             additionalHeaders: Option[HMACAdditionalHeaders] = None,
+                             contentType: Option[HMACContentType] = None,
+                             content: Option[String] = None): HMACHeaderValues = {
     val now = DateTime.now()
-    createHMACHeaderValues(uri, now)
+    val contentMd5 = md5(content)
+    val hmacRequest = HMACRequest(
+      httpVerb,
+      HMACDate(now),
+      uri,
+      additionalHeaders,
+      contentType,
+      contentMd5
+    )
+    createHMACHeaderValues(hmacRequest)
   }
 
   private[hmac] def md5(content: Option[String]): String = {
@@ -135,13 +186,13 @@ trait HMACHeaders extends LazyLogging {
     }
   }
 
-  private[hmac] def createHMACHeaderValues(uri: URI, now: DateTime): HMACHeaderValues = {
-    val hmacValue = sign(now, uri)
-    HMACHeaderValues(date = now.toRfc7231String, token = hmacValue.toHeaderValue)
+  private[hmac] def createHMACHeaderValues(hmacRequest: HMACRequest): HMACHeaderValues = {
+    val hmacValue = sign(hmacRequest)
+    HMACHeaderValues(date = hmacRequest.date.value.toRfc7231String, token = hmacValue)
   }
 
-  private[hmac] def isHMACValid(date: HMACDate, uri: URI, hmac: HMACToken): Boolean = {
-    sign(date.value, uri) == hmac.value
+  private[hmac] def isHMACValid(hmacRequest: HMACRequest, token: HMACToken): Boolean = {
+    sign(hmacRequest) == token.value
   }
 
   private[hmac] def isDateValid(date: HMACDate): Boolean  = {
@@ -153,9 +204,8 @@ trait HMACHeaders extends LazyLogging {
     delta <= allowedOffset
   }
 
-  private[hmac] def sign(date: DateTime, uri: URI): String = {
-    val input = List[String](date.toRfc7231String, uri.getPath)
-    val toSign = input.mkString("\n")
+  private[hmac] def sign(hmacRequest: HMACRequest) = {
+    val toSign = hmacRequest.toString
     logger.debug(s"Creating signature for: $toSign")
     val hmacSignature = calculateHMAC(toSign)
     logger.debug(s"HMAC signature is $hmacSignature")
