@@ -1,14 +1,18 @@
 package com.gu.hmac
 
 import java.net.URI
+import java.nio.charset.StandardCharsets
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
+
+import com.typesafe.scalalogging.LazyLogging
+import org.apache.commons.codec.binary.Base64
+import org.apache.commons.codec.digest.DigestUtils
 import org.joda.time.format.DateTimeFormat
+import org.joda.time.{DateTime, DateTimeZone}
 
 import scala.util.control.NoStackTrace
 import scala.util.{Failure, Success, Try}
-import org.joda.time.{DateTimeZone, DateTime}
-import org.apache.commons.codec.binary.Base64
 
 sealed trait HMACError extends NoStackTrace
 case class HMACInvalidTokenError(message: String) extends HMACError
@@ -89,7 +93,7 @@ object HMACAdditionalHeaders {
 
 case class HMACHeaderValues(date: String, token: String)
 
-trait HMACHeaders {
+trait HMACHeaders extends LazyLogging {
   import HMACDate.DateTimeOps
   import HMACToken.TokenOps
 
@@ -98,16 +102,37 @@ trait HMACHeaders {
   private val Algorithm = "HmacSHA256"
   private val HmacValidDurationInMinutes = 5
   private val MinuteInMilliseconds = 60000
+  private val UTF8Charset = StandardCharsets.UTF_8
 
   def validateHMACHeaders(dateHeader: String, authorizationHeader: String, uri: URI): Boolean = {
     val hmacDate = HMACDate(dateHeader)
     val hmacToken = HMACToken(authorizationHeader)
-    isDateValid(hmacDate) && isHMACValid(hmacDate, uri, hmacToken)
+    logger.debug(s"Validate HMAC headers: dateHeader = $dateHeader, authorizationHeader = $authorizationHeader")
+    val dateValid: Boolean = isDateValid(hmacDate)
+    val hmacValid: Boolean = isHMACValid(hmacDate, uri, hmacToken)
+    logger.debug(s"isDateValid = $dateValid, isHMACValid = $hmacValid")
+    dateValid && hmacValid
   }
 
   def createHMACHeaderValues(uri: URI): HMACHeaderValues = {
     val now = DateTime.now()
     createHMACHeaderValues(uri, now)
+  }
+
+  private[hmac] def md5(content: Option[String]): String = {
+    content match {
+      case Some(c) => {
+        logger.debug(s"Creating signature for: $content")
+        val digest = DigestUtils.md5(c)
+        val base64md5 = new String(Base64.encodeBase64(digest), UTF8Charset)
+        logger.debug(s"Base64 encoded MD5 is $base64md5")
+        base64md5
+      }
+      case None => {
+        logger.debug("Empty content; returning empty string")
+        ""
+      }
+    }
   }
 
   private[hmac] def createHMACHeaderValues(uri: URI, now: DateTime): HMACHeaderValues = {
@@ -122,22 +147,27 @@ trait HMACHeaders {
   private[hmac] def isDateValid(date: HMACDate): Boolean  = {
     val now = DateTime.now(DateTimeZone.forID("GMT"))
     val delta = Math.abs(date.value.getMillis - now.getMillis)
+    logger.debug(s"Delta is $delta")
     val allowedOffset = HmacValidDurationInMinutes * MinuteInMilliseconds
+    logger.debug(s"Allowed offset is $allowedOffset")
     delta <= allowedOffset
   }
 
   private[hmac] def sign(date: DateTime, uri: URI): String = {
     val input = List[String](date.toRfc7231String, uri.getPath)
     val toSign = input.mkString("\n")
-    calculateHMAC(toSign)
+    logger.debug(s"Creating signature for: $toSign")
+    val hmacSignature = calculateHMAC(toSign)
+    logger.debug(s"HMAC signature is $hmacSignature")
+    hmacSignature
   }
 
   private[hmac] def calculateHMAC(toEncode: String): String = {
-    val signingKey = new SecretKeySpec(secret.getBytes, Algorithm)
+    val signingKey = new SecretKeySpec(secret.getBytes(UTF8Charset), Algorithm)
     val mac = Mac.getInstance(Algorithm)
     mac.init(signingKey)
-    val rawHmac = mac.doFinal(toEncode.getBytes)
-    new String(Base64.encodeBase64(rawHmac))
+    val rawHmac = mac.doFinal(toEncode.getBytes(UTF8Charset))
+    new String(Base64.encodeBase64(rawHmac), UTF8Charset)
   }
 
 }

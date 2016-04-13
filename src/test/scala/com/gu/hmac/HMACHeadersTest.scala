@@ -2,6 +2,8 @@ package com.gu.hmac
 
 import java.net.URI
 
+import org.apache.commons.codec.binary.Base64
+import org.apache.commons.codec.digest.DigestUtils
 import org.joda.time.DateTime
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -71,5 +73,12 @@ class HMACHeadersTest extends FlatSpec with Matchers {
   it should "return false if the date is in the future" in {
     val inThreeMinutes = DateTime.now.plusMinutes(6)
     hmacHeader.isDateValid(HMACDate(inThreeMinutes)) should be(false)
+  }
+
+  "md5" should "return a base64 encoded md5 hash" in {
+    val expectedMD5 = DigestUtils.md5("example content")
+    val base64MD5 = hmacHeader.md5(Some("example content"))
+
+    Base64.decodeBase64(base64MD5) should be(expectedMD5)
   }
 }
