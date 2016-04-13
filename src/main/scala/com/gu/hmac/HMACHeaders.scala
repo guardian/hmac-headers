@@ -21,7 +21,7 @@ case class HMACInvalidDateError(message: String) extends HMACError
 
 object HTTP extends Enumeration {
   type Verb = Value
-  val GET, POST, PUT, PATCH, HEAD, OPTION, DELETE = Value
+  val GET, POST, PUT, PATCH, HEAD, OPTIONS, DELETE = Value
 }
 
 class HMACToken(val value: String)
