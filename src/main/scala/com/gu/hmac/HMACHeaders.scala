@@ -54,6 +54,29 @@ object HMACDate {
   }
 }
 
+class HMACAdditionalHeaders(val value: String)
+
+object HMACAdditionalHeaders {
+  def apply(
+             additionalHeaders: Seq[(String, String)],
+             whitelistedHeaderNames: Option[Seq[String]] = None,
+             headerNamePrefix: Option[String] = None
+           ): HMACAdditionalHeaders = {
+    val canonicalisedHeaders = additionalHeaders.map {
+      case (name: String, value: String) => {
+        (name.toLowerCase(), value)
+      }
+    }.groupBy(_._1).map{
+      case (name: String, headers: Seq[(String, String)]) => (name, headers.map(_._2).mkString(","))
+    }.toSeq.sortWith(_._1 < _._1).map {
+      case (name: String, concatenatedValues: String) => {
+        s"$name:$concatenatedValues"
+      }
+    }.mkString("\n")
+    new HMACAdditionalHeaders(canonicalisedHeaders)
+  }
+}
+
 case class HMACHeaderValues(date: String, token: String)
 
 trait HMACHeaders {
