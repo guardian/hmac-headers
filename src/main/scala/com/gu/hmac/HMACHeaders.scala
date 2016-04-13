@@ -71,11 +71,7 @@ object HMACContentType {
 class HMACAdditionalHeaders(val value: String)
 
 object HMACAdditionalHeaders {
-  def apply(
-             additionalHeaders: Seq[(String, String)],
-             whitelistedHeaderNames: Option[Seq[String]] = None,
-             headerNamePrefix: Option[String] = None
-           ): HMACAdditionalHeaders = {
+  def apply(additionalHeaders: Seq[(String, String)]): HMACAdditionalHeaders = {
     val canonicalisedHeaders = additionalHeaders.map {
       case (name: String, value: String) => {
         (name.toLowerCase(), value)
