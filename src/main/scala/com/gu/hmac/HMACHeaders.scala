@@ -14,16 +14,21 @@ sealed trait HMACError extends NoStackTrace
 case class HMACInvalidTokenError(message: String) extends HMACError
 case class HMACInvalidDateError(message: String) extends HMACError
 
-case class HMACToken(value: String)
 
+object HTTP extends Enumeration {
+  type Verb = Value
+  val GET, POST, PUT, PATCH, HEAD, OPTION, DELETE = Value
+}
+
+class HMACToken(val value: String)
 
 object HMACToken {
   private val HmacPattern = "HMAC\\s(.+)".r
 
-  def get(authorizationHeader: String): HMACToken =
+  def apply(authorizationHeader: String): HMACToken =
     authorizationHeader match {
-      case HmacPattern(token) => HMACToken(token)
-      case _ => throw new HMACInvalidTokenError(s"Invalid token header, should be of format $HmacPattern")
+      case HmacPattern(token) => new HMACToken(token)
+      case token => new HMACToken(token)
     }
 
   implicit class TokenOps(hmacValue: String) {
@@ -31,14 +36,18 @@ object HMACToken {
   }
 }
 
-case class HMACDate(value: DateTime)
+class HMACDate(val value: DateTime)
 
 object HMACDate {
-  def get(dateHeader: String): HMACDate = {
+  def apply(dateHeader: String): HMACDate = {
     Try(dateHeader.fromRfc7231String) match {
-      case Success(dateTime) => HMACDate(dateTime)
+      case Success(dateTime) => new HMACDate(dateTime)
       case Failure(e) => throw new HMACInvalidDateError("Invalid Date Format: " + e.getMessage)
     }
+  }
+
+  def apply(dateTime: DateTime): HMACDate = {
+    new HMACDate(dateTime)
   }
 
   // http://tools.ietf.org/html/rfc7231#section-7.1.1.2
@@ -95,8 +104,8 @@ trait HMACHeaders {
   private val MinuteInMilliseconds = 60000
 
   def validateHMACHeaders(dateHeader: String, authorizationHeader: String, uri: URI): Boolean = {
-    val hmacDate = HMACDate.get(dateHeader)
-    val hmacToken = HMACToken.get(authorizationHeader)
+    val hmacDate = HMACDate(dateHeader)
+    val hmacToken = HMACToken(authorizationHeader)
     isDateValid(hmacDate) && isHMACValid(hmacDate, uri, hmacToken)
   }
 
