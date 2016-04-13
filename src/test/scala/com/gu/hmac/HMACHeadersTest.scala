@@ -41,13 +41,6 @@ class HMACHeadersTest extends FlatSpec with Matchers {
     }
   }
 
-  it should "raise an exception if the HMAC header is in the wrong format" in {
-    val wrongTokenHeaderFormat = "abcdef"
-    intercept[HMACInvalidTokenError] {
-      hmacHeader.validateHMACHeaders(dateHeaderValue, wrongTokenHeaderFormat, uri) should be(true)
-    }
-  }
-
   "isHMACValid" should "return true if the two hmac signatures match" in {
     hmacHeader.isHMACValid(HMACDate(date), uri, HMACToken(expectedHMAC)) should be(true)
   }

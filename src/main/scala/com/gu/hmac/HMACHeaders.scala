@@ -18,16 +18,21 @@ sealed trait HMACError extends NoStackTrace
 case class HMACInvalidTokenError(message: String) extends HMACError
 case class HMACInvalidDateError(message: String) extends HMACError
 
-case class HMACToken(value: String)
 
+object HTTP extends Enumeration {
+  type Verb = Value
+  val GET, POST, PUT, PATCH, HEAD, OPTIONS, DELETE = Value
+}
+
+class HMACToken(val value: String)
 
 object HMACToken {
   private val HmacPattern = "HMAC\\s(.+)".r
 
-  def get(authorizationHeader: String): HMACToken =
+  def apply(authorizationHeader: String): HMACToken =
     authorizationHeader match {
-      case HmacPattern(token) => HMACToken(token)
-      case _ => throw new HMACInvalidTokenError(s"Invalid token header, should be of format $HmacPattern")
+      case HmacPattern(token) => new HMACToken(token)
+      case token => new HMACToken(token)
     }
 
   implicit class TokenOps(hmacValue: String) {
@@ -35,14 +40,18 @@ object HMACToken {
   }
 }
 
-case class HMACDate(value: DateTime)
+class HMACDate(val value: DateTime)
 
 object HMACDate {
-  def get(dateHeader: String): HMACDate = {
+  def apply(dateHeader: String): HMACDate = {
     Try(dateHeader.fromRfc7231String) match {
-      case Success(dateTime) => HMACDate(dateTime)
+      case Success(dateTime) => new HMACDate(dateTime)
       case Failure(e) => throw new HMACInvalidDateError("Invalid Date Format: " + e.getMessage)
     }
+  }
+
+  def apply(dateTime: DateTime): HMACDate = {
+    new HMACDate(dateTime)
   }
 
   // http://tools.ietf.org/html/rfc7231#section-7.1.1.2
@@ -55,6 +64,30 @@ object HMACDate {
 
   implicit class DateStrOps(date: String) {
     def fromRfc7231String: DateTime = HTTPDateFormat.parseDateTime(date)
+  }
+}
+
+class HMACContentType(val value: String)
+
+object HMACContentType {
+  def apply(contentTypeHeader: String): HMACContentType = new HMACContentType(contentTypeHeader.toLowerCase)
+}
+class HMACAdditionalHeaders(val value: String)
+
+object HMACAdditionalHeaders {
+  def apply(additionalHeaders: Seq[(String, String)]): HMACAdditionalHeaders = {
+    val canonicalisedHeaders = additionalHeaders.map {
+      case (name: String, value: String) => {
+        (name.toLowerCase(), value)
+      }
+    }.groupBy(_._1).map{
+      case (name: String, headers: Seq[(String, String)]) => (name, headers.map(_._2).mkString(","))
+    }.toSeq.sortWith(_._1 < _._1).map {
+      case (name: String, concatenatedValues: String) => {
+        s"$name:$concatenatedValues"
+      }
+    }.mkString("\n")
+    new HMACAdditionalHeaders(canonicalisedHeaders)
   }
 }
 
@@ -72,8 +105,8 @@ trait HMACHeaders extends LazyLogging {
   private val UTF8Charset = StandardCharsets.UTF_8
 
   def validateHMACHeaders(dateHeader: String, authorizationHeader: String, uri: URI): Boolean = {
-    val hmacDate = HMACDate.get(dateHeader)
-    val hmacToken = HMACToken.get(authorizationHeader)
+    val hmacDate = HMACDate(dateHeader)
+    val hmacToken = HMACToken(authorizationHeader)
     logger.debug(s"Validate HMAC headers: dateHeader = $dateHeader, authorizationHeader = $authorizationHeader")
     val dateValid: Boolean = isDateValid(hmacDate)
     val hmacValid: Boolean = isHMACValid(hmacDate, uri, hmacToken)
