@@ -54,6 +54,11 @@ object HMACDate {
   }
 }
 
+class HMACContentType(val value: String)
+
+object HMACContentType {
+  def apply(contentTypeHeader: String): HMACContentType = new HMACContentType(contentTypeHeader.toLowerCase)
+}
 class HMACAdditionalHeaders(val value: String)
 
 object HMACAdditionalHeaders {
