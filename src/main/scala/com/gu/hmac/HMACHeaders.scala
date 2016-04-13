@@ -1,6 +1,7 @@
 package com.gu.hmac
 
 import java.net.URI
+import java.nio.charset.StandardCharsets
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
@@ -68,6 +69,7 @@ trait HMACHeaders extends LazyLogging {
   private val Algorithm = "HmacSHA256"
   private val HmacValidDurationInMinutes = 5
   private val MinuteInMilliseconds = 60000
+  private val UTF8Charset = StandardCharsets.UTF_8
 
   def validateHMACHeaders(dateHeader: String, authorizationHeader: String, uri: URI): Boolean = {
     val hmacDate = HMACDate.get(dateHeader)
@@ -89,7 +91,7 @@ trait HMACHeaders extends LazyLogging {
       case Some(c) => {
         logger.debug(s"Creating signature for: $content")
         val digest = DigestUtils.md5(c)
-        val base64md5 = new String(Base64.encodeBase64(digest))
+        val base64md5 = new String(Base64.encodeBase64(digest), UTF8Charset)
         logger.debug(s"Base64 encoded MD5 is $base64md5")
         base64md5
       }
@@ -128,11 +130,11 @@ trait HMACHeaders extends LazyLogging {
   }
 
   private[hmac] def calculateHMAC(toEncode: String): String = {
-    val signingKey = new SecretKeySpec(secret.getBytes, Algorithm)
+    val signingKey = new SecretKeySpec(secret.getBytes(UTF8Charset), Algorithm)
     val mac = Mac.getInstance(Algorithm)
     mac.init(signingKey)
-    val rawHmac = mac.doFinal(toEncode.getBytes)
-    new String(Base64.encodeBase64(rawHmac))
+    val rawHmac = mac.doFinal(toEncode.getBytes(UTF8Charset))
+    new String(Base64.encodeBase64(rawHmac), UTF8Charset)
   }
 
 }
