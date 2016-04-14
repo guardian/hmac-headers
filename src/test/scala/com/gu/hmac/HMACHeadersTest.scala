@@ -26,7 +26,7 @@ class HMACHeadersTest extends FlatSpec with Matchers {
     uri = uri,
     additionalHeaders = None,
     contentType = None,
-    contentMd5 = ""
+    contentMd5 = None
   )
 
 
@@ -117,10 +117,10 @@ class HMACHeadersTest extends FlatSpec with Matchers {
     hmacHeader.isDateValid(HMACDate(inThreeMinutes)) should be(false)
   }
 
-  "md5" should "return a base64 encoded md5 hash" in {
+  "HMACContentMD5" should "return a base64 encoded md5 hash" in {
     val expectedMD5 = DigestUtils.md5("example content")
-    val base64MD5 = hmacHeader.md5(Some("example content"))
+    val base64MD5 = HMACContentMD5(Some("example content"))
 
-    Base64.decodeBase64(base64MD5) should be(expectedMD5)
+    Base64.decodeBase64(base64MD5.toString) should be(expectedMD5)
   }
 }

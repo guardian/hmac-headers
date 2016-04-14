@@ -65,15 +65,42 @@ object HMACDate {
   }
 }
 
-class HMACContentType(val value: String)
+class HMACContentType(val value: String) {
+  override def toString: String = value
+}
 
 object HMACContentType {
   def apply(contentTypeHeader: String): HMACContentType = new HMACContentType(contentTypeHeader.toLowerCase)
+}
 
-  implicit class ContentTypeStrOps(contentTypeOpt: Option[HMACContentType]) {
-    def toStringValue: String = contentTypeOpt.map(_.value).getOrElse("")
+class HMACContentMD5(val value: String) {
+  override def toString: String = value
+}
+
+object HMACContentMD5 extends LazyLogging {
+
+  private val UTF8Charset = StandardCharsets.UTF_8
+
+  def apply(md5: String): HMACContentMD5 = new HMACContentMD5(md5)
+
+ def apply(content: Option[String]): HMACContentMD5 = {
+   val contentMd5 = content match {
+     case Some(c) => {
+       logger.debug(s"Creating signature for: $content")
+       val digest = DigestUtils.md5(c)
+       val base64md5 = new String(Base64.encodeBase64(digest), UTF8Charset)
+       logger.debug(s"Base64 encoded MD5 is $base64md5")
+       base64md5
+     }
+     case None => {
+       logger.debug("Empty content; returning empty string")
+       ""
+     }
+   }
+   new HMACContentMD5(contentMd5)
   }
 }
+
 class HMACAdditionalHeaders(val value: String)
 
 object HMACAdditionalHeaders {
@@ -116,17 +143,17 @@ case class HMACRequest(httpVerb: HTTP.Verb,
                        uri: URI,
                        additionalHeaders: Option[HMACAdditionalHeaders] = None,
                        contentType: Option[HMACContentType] = None,
-                       contentMd5: String = "") {
+                       contentMd5: Option[HMACContentMD5] = None) {
   import HMACDate.DateTimeOps
 
   override def toString = {
-    val values = Seq(
+    val values: Seq[String] = Seq(
       httpVerb.toString,
-      contentMd5,
-      contentType.toStringValue,
+      contentMd5.toString,
+      contentType.toString,
       date.value.toRfc7231String,
       uri.getPath,
-      additionalHeaders
+      additionalHeaders.toStringValue
     )
     values.mkString("\n")
   }
@@ -150,9 +177,8 @@ trait HMACHeaders extends LazyLogging {
                            uri: URI,
                            additionalHeaders: Option[HMACAdditionalHeaders] = None,
                            contentType: Option[HMACContentType] = None,
-                           content: Option[String] = None
+                           contentMd5: Option[HMACContentMD5] = None
                          )(token: HMACToken): Boolean = {
-    val contentMd5 = md5(content)
     val hmacRequest = HMACRequest(
       httpVerb,
       date,
@@ -172,9 +198,8 @@ trait HMACHeaders extends LazyLogging {
                              uri: URI,
                              additionalHeaders: Option[HMACAdditionalHeaders] = None,
                              contentType: Option[HMACContentType] = None,
-                             content: Option[String] = None): HMACHeaderValues = {
+                             contentMd5: Option[HMACContentMD5] = None): HMACHeaderValues = {
     val now = DateTime.now()
-    val contentMd5 = md5(content)
     val hmacRequest = HMACRequest(
       httpVerb,
       HMACDate(now),
@@ -184,22 +209,6 @@ trait HMACHeaders extends LazyLogging {
       contentMd5
     )
     createHMACHeaderValues(hmacRequest)
-  }
-
-  private[hmac] def md5(content: Option[String]): String = {
-    content match {
-      case Some(c) => {
-        logger.debug(s"Creating signature for: $content")
-        val digest = DigestUtils.md5(c)
-        val base64md5 = new String(Base64.encodeBase64(digest), UTF8Charset)
-        logger.debug(s"Base64 encoded MD5 is $base64md5")
-        base64md5
-      }
-      case None => {
-        logger.debug("Empty content; returning empty string")
-        ""
-      }
-    }
   }
 
   private[hmac] def createHMACHeaderValues(hmacRequest: HMACRequest): HMACHeaderValues = {
