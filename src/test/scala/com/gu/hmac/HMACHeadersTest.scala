@@ -19,14 +19,15 @@ class HMACHeadersTest extends FlatSpec with Matchers {
 
   val uri = new URI("http:///www.theguardian.com/signin?query=someData")
   val date = new DateTime(1994, 11, 15, 8, 12)
+  val body = Some("{\"some\": \"json\"}")
 
   val hmacRequest = HMACRequest(
-    httpVerb = HTTP.GET,
+    httpVerb = HTTP.POST,
     date = HMACDate(date),
     uri = uri,
     additionalHeaders = None,
     contentType = None,
-    contentMd5 = None
+    contentMd5 = HMACContentMD5(body)
   )
 
 
@@ -53,7 +54,9 @@ class HMACHeadersTest extends FlatSpec with Matchers {
     val isHmacValid = hmacHeader.validateHMACHeaders(
       httpVerb = validHmacRequest.httpVerb,
       date = validHmacRequest.date,
-      uri = validHmacRequest.uri)(HMACToken(hmac))
+      uri = validHmacRequest.uri,
+      contentMd5 = validHmacRequest.contentMd5
+    )(HMACToken(hmac))
     isHmacValid should be(true)
   }
 
@@ -119,7 +122,7 @@ class HMACHeadersTest extends FlatSpec with Matchers {
 
   "HMACContentMD5" should "return a base64 encoded md5 hash" in {
     val expectedMD5 = DigestUtils.md5("example content")
-    val base64MD5 = HMACContentMD5(Some("example content"))
+    val base64MD5 = HMACContentMD5(Some("example content")).get
 
     Base64.decodeBase64(base64MD5.toString) should be(expectedMD5)
   }

@@ -83,7 +83,7 @@ object HMACContentMD5 extends LazyLogging {
 
   def apply(md5: String): HMACContentMD5 = new HMACContentMD5(md5)
 
- def apply(content: Option[String]): HMACContentMD5 = {
+ def apply(content: Option[String]): Option[HMACContentMD5] = {
    val contentMd5 = content match {
      case Some(c) => {
        logger.debug(s"Creating signature for: $content")
@@ -97,7 +97,7 @@ object HMACContentMD5 extends LazyLogging {
        ""
      }
    }
-   new HMACContentMD5(contentMd5)
+   new Some(HMACContentMD5(contentMd5))
   }
 }
 
