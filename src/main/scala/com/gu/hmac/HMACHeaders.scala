@@ -29,10 +29,12 @@ class HMACToken(val value: String)
 object HMACToken {
   private val HmacPattern = "HMAC\\s(.+)".r
 
-  def apply(authorizationHeader: String): HMACToken =
+  def apply(token: String): HMACToken = new HMACToken(token)
+
+  def parseHeader(authorizationHeader: String) =
     authorizationHeader match {
       case HmacPattern(token) => new HMACToken(token)
-      case token => new HMACToken(token)
+      case _ => throw new HMACInvalidTokenError(s"Invalid token header, should be of format $HmacPattern")
     }
 }
 
