@@ -75,19 +75,33 @@ object HMACContentType {
 class HMACAdditionalHeaders(val value: String)
 
 object HMACAdditionalHeaders {
+
+  private[hmac] def lowerCaseHeaderNames(h: Seq[(String, String)]): Seq[(String, String)] = h.map {
+    case (name: String, value: String) => {
+      (name.toLowerCase(), value)
+    }
+  }
+
+  private[hmac] def concatenateHeadersWithSameName(h: Seq[(String, String)]): Map[String, String] = h.groupBy(_._1).map{
+    case (name: String, headers: Seq[(String, String)]) => (name, headers.map(_._2).mkString(","))
+  }
+
+  private[hmac] def sortByHeaderName(h: Map[String, String]): Seq[(String, String)] = h.toSeq.sortWith(_._1 < _._1)
+
+  private[hmac] def concatenateAllHeaders(h: Seq[(String, String)]): String = h.map {
+    case (name: String, concatenatedValues: String) => {
+      s"$name:$concatenatedValues"
+    }
+  }.mkString("\n")
+
+  private[hmac] def canonicalisedHeaders =
+    lowerCaseHeaderNames _ andThen
+    concatenateHeadersWithSameName andThen
+    sortByHeaderName andThen
+    concatenateAllHeaders
+
   def apply(additionalHeaders: Seq[(String, String)]): HMACAdditionalHeaders = {
-    val canonicalisedHeaders = additionalHeaders.map {
-      case (name: String, value: String) => {
-        (name.toLowerCase(), value)
-      }
-    }.groupBy(_._1).map{
-      case (name: String, headers: Seq[(String, String)]) => (name, headers.map(_._2).mkString(","))
-    }.toSeq.sortWith(_._1 < _._1).map {
-      case (name: String, concatenatedValues: String) => {
-        s"$name:$concatenatedValues"
-      }
-    }.mkString("\n")
-    new HMACAdditionalHeaders(canonicalisedHeaders)
+    new HMACAdditionalHeaders(canonicalisedHeaders(additionalHeaders))
   }
 
   implicit class AdditionalHeadersStrOps(additionalHeadersOpt: Option[HMACAdditionalHeaders]) {
