@@ -70,7 +70,18 @@ class HMACContentType(val value: String) {
 }
 
 object HMACContentType {
-  def apply(contentTypeHeader: String): HMACContentType = new HMACContentType(contentTypeHeader.toLowerCase)
+  def apply(contentTypeHeader: String): Option[HMACContentType] = Some(new HMACContentType(contentTypeHeader.toLowerCase))
+
+  def apply(contentTypeHeaderOpt: Option[String]): Option[HMACContentType] = {
+    contentTypeHeaderOpt match {
+      case Some(contentTypeHeader) => Some(new HMACContentType(contentTypeHeader.toLowerCase))
+      case None => None
+    }
+  }
+
+  implicit class ContentTypeStrOps(contentType: Option[HMACContentType]) {
+    def toStringValue: String = contentType.map(_.value).getOrElse("")
+  }
 }
 
 class HMACContentMD5(val value: String) {
@@ -81,24 +92,32 @@ object HMACContentMD5 extends LazyLogging {
 
   private val UTF8Charset = StandardCharsets.UTF_8
 
-  def apply(md5: String): HMACContentMD5 = new HMACContentMD5(md5)
-
- def apply(content: Option[String]): Option[HMACContentMD5] = {
-   val contentMd5 = content match {
-     case Some(c) => {
-       logger.debug(s"Creating signature for: $content")
-       val digest = DigestUtils.md5(c)
-       val base64md5 = new String(Base64.encodeBase64(digest), UTF8Charset)
-       logger.debug(s"Base64 encoded MD5 is $base64md5")
-       base64md5
-     }
-     case None => {
-       logger.debug("Empty content; returning empty string")
-       ""
-     }
-   }
-   Some(new HMACContentMD5(contentMd5))
+  def base64EncodedMd5DigestFromContent(content: Option[String]): String = {
+    content match {
+      case Some(c) => {
+        val digest = DigestUtils.md5(c)
+        val base64md5 = new String(Base64.encodeBase64(digest), UTF8Charset)
+        base64md5
+      }
+      case None => {
+        ""
+      }
+    }
   }
+
+  def apply(base64EncodedMd5Digest: String): HMACContentMD5 = new HMACContentMD5(base64EncodedMd5Digest)
+
+  def apply(content: Option[String]): Option[HMACContentMD5] = {
+    logger.debug(s"Creating signature for: $content")
+    val base64EncodedMd5Digest = base64EncodedMd5DigestFromContent(content)
+    logger.debug(s"Base64 encoded MD5 is $base64EncodedMd5Digest")
+    Some(new HMACContentMD5(base64EncodedMd5Digest))
+  }
+
+  implicit class ContentMD5StrOps(contentMd5: Option[HMACContentMD5]) {
+    def toStringValue: String = contentMd5.map(_.value).getOrElse("")
+  }
+
 }
 
 class HMACAdditionalHeaders(val value: String)
@@ -145,17 +164,21 @@ case class HMACRequest(httpVerb: HTTP.Verb,
                        contentType: Option[HMACContentType] = None,
                        contentMd5: Option[HMACContentMD5] = None) {
   import HMACDate.DateTimeOps
+  import HMACAdditionalHeaders.AdditionalHeadersStrOps
+  import HMACContentMD5.ContentMD5StrOps
+  import HMACContentType.ContentTypeStrOps
 
-  override def toString = {
-    val values: Seq[String] = Seq(
+  def toSeq: Seq[String] = Seq(
       httpVerb.toString,
-      contentMd5.toString,
-      contentType.toString,
+      contentMd5.toStringValue,
+      contentType.toStringValue,
       date.value.toRfc7231String,
       uri.getPath,
       additionalHeaders.toStringValue
-    )
-    values.mkString("\n")
+  )
+
+  override def toString = {
+    toSeq.mkString("\n")
   }
 }
 
