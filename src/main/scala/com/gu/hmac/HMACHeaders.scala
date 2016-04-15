@@ -97,7 +97,7 @@ object HMACContentMD5 extends LazyLogging {
        ""
      }
    }
-   new Some(HMACContentMD5(contentMd5))
+   Some(new HMACContentMD5(contentMd5))
   }
 }
 
