@@ -9,7 +9,7 @@ scalaVersion := "2.11.8"
 
 organization := "com.gu"
 
-crossScalaVersions := Seq(scalaVersion.value)
+crossScalaVersions := Seq(scalaVersion.value, "2.12.2")
 
 scmInfo := Some(ScmInfo(
   url("https://github.com/guardian/hmac-headers"),
@@ -22,8 +22,8 @@ libraryDependencies ++= Seq(
   "joda-time" % "joda-time" % "2.9.3",
   "commons-codec" % "commons-codec" % "1.10",
   "org.joda" % "joda-convert" % "1.8.1",
-  "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0",
-  "org.scalatest" % "scalatest_2.11" % "2.2.6" % "test"
+  "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
+  "org.scalatest" %% "scalatest" % "3.0.4" % "test"
 )
 
 pomExtra := (
