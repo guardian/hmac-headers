@@ -1,6 +1,7 @@
 package com.gu.hmac
 
 import java.net.URI
+import java.nio.charset.StandardCharsets
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import org.joda.time.format.DateTimeFormat
@@ -65,6 +66,7 @@ trait HMACHeaders {
   private val Algorithm = "HmacSHA256"
   private val HmacValidDurationInMinutes = 5
   private val MinuteInMilliseconds = 60000
+  private val UTF8Charset = StandardCharsets.UTF_8
 
   def validateHMACHeaders(dateHeader: String, authorizationHeader: String, uri: URI): Boolean = {
     val hmacDate = HMACDate.get(dateHeader)
@@ -100,11 +102,11 @@ trait HMACHeaders {
   }
 
   private[hmac] def calculateHMAC(toEncode: String): String = {
-    val signingKey = new SecretKeySpec(secret.getBytes, Algorithm)
+    val signingKey = new SecretKeySpec(secret.getBytes(UTF8Charset), Algorithm)
     val mac = Mac.getInstance(Algorithm)
     mac.init(signingKey)
-    val rawHmac = mac.doFinal(toEncode.getBytes)
-    new String(Base64.encodeBase64(rawHmac))
+    val rawHmac = mac.doFinal(toEncode.getBytes(UTF8Charset))
+    new String(Base64.encodeBase64(rawHmac), UTF8Charset)
   }
 
 }
