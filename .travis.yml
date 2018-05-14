@@ -9,6 +9,7 @@ before_script:
 
 scala:
    - 2.11.5
+   - 2.12.2
 
 script:
    - travis_retry sbt ++$TRAVIS_SCALA_VERSION test
