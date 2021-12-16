@@ -1,11 +1,11 @@
 package com.gu.hmac
 
 import java.net.URI
-
 import org.joda.time.DateTime
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.flatspec.AnyFlatSpec
 
-class HMACHeadersTest extends FlatSpec with Matchers {
+class HMACHeadersTest extends AnyFlatSpec with Matchers {
   import HMACDate.DateTimeOps
   val hmacHeader = new HMACHeaders {
     override def secret = "secret"
