@@ -3,13 +3,11 @@ import ReleaseTransformations._
 
 name := "hmac-headers"
 
-version := "1.1.2"
-
-scalaVersion := "2.11.8"
+scalaVersion := "2.13.7"
 
 organization := "com.gu"
 
-crossScalaVersions := Seq(scalaVersion.value, "2.12.2")
+crossScalaVersions := Seq("2.11.8", "2.12.2", scalaVersion.value)
 
 scmInfo := Some(ScmInfo(
   url("https://github.com/guardian/hmac-headers"),
@@ -22,7 +20,10 @@ libraryDependencies ++= Seq(
   "joda-time" % "joda-time" % "2.9.3",
   "commons-codec" % "commons-codec" % "1.10",
   "org.joda" % "joda-convert" % "1.8.1",
-  "org.scalatest" %% "scalatest" % "3.0.4" % "test"
+  "com.typesafe.scala-logging" %% "scala-logging" % "3.9.4",
+  "org.scalatest" %% "scalatest" % "3.2.10" % "test",
+  "org.scalatest" %% "scalatest-flatspec" % "3.2.10" % "test",
+  "org.scalatest" %% "scalatest-shouldmatchers" % "3.2.10" % "test"
 )
 
 pomExtra := (
@@ -40,7 +41,7 @@ pomExtra := (
   </developers>)
 
 publishMavenStyle := true
-publishArtifact in Test := false
+Test / publishArtifact := false
 licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0.html"))
 
 publishTo := {
