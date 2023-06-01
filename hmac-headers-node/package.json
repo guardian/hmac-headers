@@ -1,0 +1,21 @@
+{
+  "name": "@guardian/hmac-headers",
+  "version": "0.0.0-this-never-updates-in-source-code-refer-to-git-tags",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "tsc": "^2.0.4",
+    "typescript": "^5.0.4"
+  },
+  "devDependencies": {
+    "@guardian/eslint-config-typescript": "^3.0.0",
+    "@guardian/tsconfig": "^0.2.0",
+    "@types/node": "^20.2.5"
+  }
+}
