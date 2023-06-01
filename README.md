@@ -1,3 +1,4 @@
-[![Build Status](https://travis-ci.org/guardian/hmac-headers.svg?branch=master)](https://travis-ci.org/guardian/hmac-headers)
-
 # hmac-headers
+
+The canonical source for implementing [HMAC](https://en.wikipedia.org/wiki/HMAC) authentication in Guardian tools.
+
