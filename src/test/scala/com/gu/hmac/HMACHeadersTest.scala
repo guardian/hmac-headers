@@ -5,31 +5,53 @@ import org.joda.time.DateTime
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.flatspec.AnyFlatSpec
 
+import java.time.{Clock, Instant, ZoneId}
+
 class HMACHeadersTest extends AnyFlatSpec with Matchers {
   import HMACDate.DateTimeOps
-  val hmacHeader = new HMACHeaders {
-    override def secret = "secret"
-  }
-
-  val wrongHmacHeader = new HMACHeaders {
-    override def secret = "wrong"
-  }
+  val validSecret = "secret"
+  val invalidSecret = "wrong"
 
   val uri = new URI("http:///www.theguardian.com/signin?query=someData")
   val date = new DateTime(1994, 11, 15, 8, 12)
-  val expectedHMAC = hmacHeader.sign(date, uri)
+
+  val expectedHMAC = "3AQ08uT4ToOISOXWMr68UvzrgrqIx3KK/pKEenwVES8="
   val dateHeaderValue = "Tue, 15 Nov 1994 08:12:00 GMT"
 
-  "createHMACHeaderValues" should "create a Date and Authorization token base on a URI and a secret" in {
-    val headers = hmacHeader.createHMACHeaderValues(uri, date)
+  val javaInstant = Instant.ofEpochMilli(date.toInstant.getMillis)
+
+  val fixedClock =
+    Clock.fixed(javaInstant, ZoneId.systemDefault)
+
+  val hmacHeader = new HMACHeaders {
+    override val clock: Clock = fixedClock
+    override def secret = validSecret
+  }
+
+  val wrongHmacHeader = new HMACHeaders {
+    override val clock: Clock = fixedClock
+    override def secret = invalidSecret
+  }
+
+  val hmacValidator = new ValidateHMACHeader {
+    override val clock: Clock = fixedClock
+  }
+
+  val hmacCreator = new CreateHMACHeader {
+    override val clock: Clock = fixedClock
+  }
+
+  behavior of "HMACHeaders"
+
+  "createHMACHeaderValues" should "create a Date and Authorization token based on a URI and a secret" in {
+    val headers = hmacHeader.createHMACHeaderValues(uri)
     headers.date should be(dateHeaderValue)
     headers.token should be(s"HMAC $expectedHMAC")
   }
 
   "validateHMACHeaders" should "return true if the HMAC and the date are valid" in {
-    val now = DateTime.now()
-    val hmac = hmacHeader.sign(now, uri)
-    hmacHeader.validateHMACHeaders(now.toRfc7231String, s"HMAC $hmac", uri) should be(true)
+    val now = new DateTime(fixedClock.instant().toEpochMilli())
+    hmacHeader.validateHMACHeaders(now.toRfc7231String, s"HMAC $expectedHMAC", uri) should be(true)
   }
 
   it should "raise an exception if the Date header is in the wrong format" in {
@@ -46,37 +68,63 @@ class HMACHeadersTest extends AnyFlatSpec with Matchers {
     }
   }
 
+  behavior of "CreateHMACHeader"
+
+  "createHMACHeaderValuesWithSecret" should "create a Date and Authorization token based on a URI and a secret" in {
+    val headers = hmacCreator.createHMACHeaderValuesWithSecret(validSecret, uri)
+    headers.date should be(dateHeaderValue)
+    headers.token should be(s"HMAC $expectedHMAC")
+  }
+
+  behavior of "ValidateHMACHeader"
+
+  "validateHMACHeadersWithSecret" should "return true if the HMAC and the date are valid" in {
+    val now = new DateTime(fixedClock.instant().toEpochMilli())
+    hmacValidator.validateHMACHeadersWithSecret(hmacHeader.secret, now.toRfc7231String, s"HMAC $expectedHMAC", uri) should be(true)
+  }
+
+  it should "return false if the HMAC is invalid" in {
+    val now = new DateTime(fixedClock.instant().toEpochMilli())
+    hmacValidator.validateHMACHeadersWithSecret(hmacHeader.secret, now.toRfc7231String, s"HMAC nope", uri) should be(false)
+  }
+
+  it should "return false if the date is invalid" in {
+    val now = new DateTime(fixedClock.instant().toEpochMilli())
+    val tenMinutesAgo = now.minusMinutes(10)
+    hmacValidator.validateHMACHeadersWithSecret(hmacHeader.secret, tenMinutesAgo.toRfc7231String, s"HMAC $expectedHMAC", uri) should be(false)
+  }
+
   "isHMACValid" should "return true if the two hmac signatures match" in {
-    hmacHeader.isHMACValid(HMACDate(date), uri, HMACToken(expectedHMAC)) should be(true)
+    hmacValidator.isHMACValid(hmacHeader.secret, HMACDate(date), uri, HMACToken(expectedHMAC)) should be(true)
   }
 
   it should "return false if the two dates do not match" in {
     val wrongDate = new DateTime(1993, 11, 15, 8, 12)
-    hmacHeader.isHMACValid(HMACDate(wrongDate), uri, HMACToken(expectedHMAC)) should be(false)
+    hmacValidator.isHMACValid(hmacHeader.secret, HMACDate(wrongDate), uri, HMACToken(expectedHMAC)) should be(false)
   }
 
   it should "return false if the two URIs do not match" in {
     val wrongUri = new URI("http:///www.theguardian.com/other")
-    hmacHeader.isHMACValid(HMACDate(date), wrongUri, HMACToken(expectedHMAC)) should be(false)
+    hmacValidator.isHMACValid(hmacHeader.secret, HMACDate(date), wrongUri, HMACToken(expectedHMAC)) should be(false)
   }
 
   it should "return false if the two secrets do not match" in {
-    val wrongHMAC = wrongHmacHeader.sign(date, uri)
-    hmacHeader.isHMACValid(HMACDate(date), uri, HMACToken(wrongHMAC)) should be(false)
+    val wrongHMAC = HMACSignatory.sign(wrongHmacHeader.secret, date, uri)
+    hmacValidator.isHMACValid(hmacHeader.secret, HMACDate(date), uri, HMACToken(wrongHMAC)) should be(false)
   }
 
   "isDateValid" should "return true if the date is within the expected time frame" in {
-    val threeMinutesAgo = DateTime.now.minusMinutes(3)
-    hmacHeader.isDateValid(HMACDate(threeMinutesAgo)) should be(true)
+    val threeMinutesAgo = date.minusMinutes(3)
+    hmacValidator.isDateValid(HMACDate(threeMinutesAgo)) should be(true)
   }
 
   it should "return false if the date is outside the expected time frame" in {
-    val sixMinutesAgo = DateTime.now.minusMinutes(6)
-    hmacHeader.isDateValid(HMACDate(sixMinutesAgo)) should be(false)
+    val sixMinutesAgo = date.minusMinutes(6)
+    hmacValidator.isDateValid(HMACDate(sixMinutesAgo)) should be(false)
   }
 
   it should "return false if the date is in the future" in {
-    val inThreeMinutes = DateTime.now.plusMinutes(6)
-    hmacHeader.isDateValid(HMACDate(inThreeMinutes)) should be(false)
+    val inSixMinutes = date.plusMinutes(6)
+    hmacValidator.isDateValid(HMACDate(inSixMinutes)) should be(false)
   }
 }
