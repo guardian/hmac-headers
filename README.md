@@ -16,7 +16,7 @@ Given a secret key shared between the client and the server, hmac-headers can do
 In your build.sbt:
 
 ```
-libraryDependencies += "com.gu" %% "hmac-headers" % "1.0"
+libraryDependencies += "com.gu" %% "hmac-headers" % "<version>" // find the latest version by checking this repo's tags
 ```
 
 ## Verifying requests
