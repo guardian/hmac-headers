@@ -1,18 +1,21 @@
 package com.gu.hmac
 
+import org.apache.commons.codec.binary.Base64
+import org.joda.time.format.DateTimeFormat
+import org.joda.time.{DateTime, DateTimeZone}
+
 import java.net.URI
 import java.nio.charset.StandardCharsets
+import java.time.Clock
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
-import org.joda.time.format.DateTimeFormat
-
 import scala.util.control.NoStackTrace
 import scala.util.{Failure, Success, Try}
-import org.joda.time.{DateTimeZone, DateTime}
-import org.apache.commons.codec.binary.Base64
 
 sealed trait HMACError extends NoStackTrace
+
 case class HMACInvalidTokenError(message: String) extends HMACError
+
 case class HMACInvalidDateError(message: String) extends HMACError
 
 case class HMACToken(value: String)
@@ -57,56 +60,73 @@ object HMACDate {
 
 case class HMACHeaderValues(date: String, token: String)
 
-trait HMACHeaders {
+object HMACSignatory {
   import HMACDate.DateTimeOps
-  import HMACToken.TokenOps
 
-  def secret: String
+  final val Algorithm = "HmacSHA256"
+  final val UTF8Charset = StandardCharsets.UTF_8
 
-  private val Algorithm = "HmacSHA256"
-  private val HmacValidDurationInMinutes = 5
-  private val MinuteInMilliseconds = 60000
-  private val UTF8Charset = StandardCharsets.UTF_8
-
-  def validateHMACHeaders(dateHeader: String, authorizationHeader: String, uri: URI): Boolean = {
-    val hmacDate = HMACDate.get(dateHeader)
-    val hmacToken = HMACToken.get(authorizationHeader)
-    isDateValid(hmacDate) && isHMACValid(hmacDate, uri, hmacToken)
-  }
-
-  def createHMACHeaderValues(uri: URI): HMACHeaderValues = {
-    val now = DateTime.now()
-    createHMACHeaderValues(uri, now)
-  }
-
-  private[hmac] def createHMACHeaderValues(uri: URI, now: DateTime): HMACHeaderValues = {
-    val hmacValue = sign(now, uri)
-    HMACHeaderValues(date = now.toRfc7231String, token = hmacValue.toHeaderValue)
-  }
-
-  private[hmac] def isHMACValid(date: HMACDate, uri: URI, hmac: HMACToken): Boolean = {
-    sign(date.value, uri) == hmac.value
-  }
-
-  private[hmac] def isDateValid(date: HMACDate): Boolean  = {
-    val now = DateTime.now(DateTimeZone.forID("GMT"))
-    val delta = Math.abs(date.value.getMillis - now.getMillis)
-    val allowedOffset = HmacValidDurationInMinutes * MinuteInMilliseconds
-    delta <= allowedOffset
-  }
-
-  private[hmac] def sign(date: DateTime, uri: URI): String = {
+  def sign(secretKey: String, date: DateTime, uri: URI): String = {
     val input = List[String](date.toRfc7231String, uri.getPath)
     val toSign = input.mkString("\n")
-    calculateHMAC(toSign)
+    calculateHMAC(secretKey, toSign)
   }
 
-  private[hmac] def calculateHMAC(toEncode: String): String = {
-    val signingKey = new SecretKeySpec(secret.getBytes(UTF8Charset), Algorithm)
+  private def calculateHMAC(secretKey: String, toEncode: String): String = {
+    val signingKey = new SecretKeySpec(secretKey.getBytes(UTF8Charset), Algorithm)
     val mac = Mac.getInstance(Algorithm)
     mac.init(signingKey)
     val rawHmac = mac.doFinal(toEncode.getBytes(UTF8Charset))
     new String(Base64.encodeBase64(rawHmac), UTF8Charset)
   }
-
 }
+
+trait SystemClock {
+  protected val clock: Clock = Clock.systemDefaultZone()
+}
+
+trait CreateHMACHeader extends SystemClock {
+  import HMACToken.TokenOps
+  import HMACDate.DateTimeOps
+
+  def createHMACHeaderValuesWithSecret(secretKey: String, uri: URI): HMACHeaderValues = {
+    val now = new DateTime(clock.instant().toEpochMilli())
+    val hmacValue = HMACSignatory.sign(secretKey, now, uri)
+    HMACHeaderValues(date = now.toRfc7231String, token = hmacValue.toHeaderValue)
+  }
+}
+
+trait ValidateHMACHeader extends SystemClock {
+  final val HmacValidDurationInMinutes = 5
+  final val MinuteInMilliseconds = 60000
+
+  def validateHMACHeadersWithSecret(secretKey: String, dateHeader: String, authorizationHeader: String, uri: URI): Boolean = {
+    val hmacDate = HMACDate.get(dateHeader)
+    val hmacToken = HMACToken.get(authorizationHeader)
+
+    isDateValid(hmacDate) && isHMACValid(secretKey, hmacDate, uri, hmacToken)
+  }
+
+  private[hmac] def isHMACValid(secretKey: String, date: HMACDate, uri: URI, hmac: HMACToken): Boolean = {
+    HMACSignatory.sign(secretKey, date.value, uri) == hmac.value
+  }
+
+  private[hmac] def isDateValid(date: HMACDate): Boolean = {
+    val now = new DateTime(clock.instant().toEpochMilli())
+    val delta = Math.abs(date.value.getMillis - now.getMillis)
+    val allowedOffset = HmacValidDurationInMinutes * MinuteInMilliseconds
+    delta <= allowedOffset
+  }
+}
+
+trait HMACHeaders extends ValidateHMACHeader with CreateHMACHeader {
+  def secret: String
+
+  def validateHMACHeaders(dateHeader: String, authorizationHeader: String, uri: URI): Boolean =
+    validateHMACHeadersWithSecret(secret, dateHeader, authorizationHeader, uri)
+
+  def createHMACHeaderValues(uri: URI): HMACHeaderValues =
+    createHMACHeaderValuesWithSecret(secret, uri)
+}
+
+
