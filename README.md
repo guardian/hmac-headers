@@ -19,6 +19,36 @@ In your build.sbt:
 libraryDependencies += "com.gu" %% "hmac-headers" % "<version>" // find the latest version by checking this repo's tags
 ```
 
+## Releasing
+
+### Testing locally
+
+You can publish locally by running:
+
+```shell
+# Test your signing setup works (you may need to follow the guide below first)
+sbt +publishLocalSigned
+
+# Publish locally so that other projects can use your local ivy repository
+sbt +publishLocal
+```
+
+### Get access to publish
+You will need to have access to publish to Maven Central for `com.gu` assets. 
+You can [follow this guide](https://docs.google.com/document/d/1rNXjoZDqZMsQblOVXPAIIOMWuwUKe3KzTCttuqS7AcY/edit#heading=h.651termw35o0) 
+to get access.
+
+### Update the version
+When you are ready to release, ensure that [`version.sbt`](./version.sbt) is updated and committed in the default branch
+(`main`) with an appropriate version bump following [`semver`](https://semver.org/).
+
+### Tag and release
+```shell
+git tag -a v2.x -m "Releasing version 2.x"
+git push origin v2.x
+sbt release
+````
+
 ## Verifying requests
 
 ```
