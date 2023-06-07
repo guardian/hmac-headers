@@ -43,9 +43,10 @@ When you are ready to release, ensure that [`version.sbt`](./version.sbt) is upd
 (`main`) with an appropriate version bump following [`semver`](https://semver.org/).
 
 ### Tag and release
+
+This will create & push the appropriate version tag for you:
+
 ```shell
-git tag -a v2.x -m "Releasing version 2.x"
-git push origin v2.x
 sbt release
 ````
 
