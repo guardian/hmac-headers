@@ -1,3 +1,5 @@
+[![hmac-headers Scala version support](https://index.scala-lang.org/guardian/hmac-headers/hmac-headers/latest-by-scala-version.svg?platform=jvm)](https://index.scala-lang.org/guardian/hmac-headers/hmac-headers)
+
 # Introduction
 
 hmac-headers is a Scala utility for signing and verifying HMAC signatures passed in a header in a HTTP request.
