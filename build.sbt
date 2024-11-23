@@ -1,20 +1,15 @@
-import sbtrelease._
-import ReleaseTransformations._
+import ReleaseTransformations.*
+import sbtversionpolicy.withsbtrelease.ReleaseVersion
 
 name := "hmac-headers"
 
-scalaVersion := "2.13.7"
+scalaVersion := "3.3.4"
 
 organization := "com.gu"
 
-crossScalaVersions := Seq("2.11.8", "2.12.2", scalaVersion.value)
+crossScalaVersions := Seq("2.12.20", "2.13.15", scalaVersion.value)
 
-scmInfo := Some(ScmInfo(
-  url("https://github.com/guardian/hmac-headers"),
-  "scm:git:git@github.com:guardian/hmac-headers.git"
-))
-
-homepage := Some(url("https://github.com/guardian/hmac-headers"))
+scalacOptions := Seq("-deprecation", "-release:11")
 
 libraryDependencies ++= Seq(
   "joda-time" % "joda-time" % "2.9.3",
@@ -24,34 +19,13 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "3.2.10" % "test"
 )
 
-pomExtra := (
-  <developers>
-    <developer>
-      <id>nlindblad</id>
-      <name>Niklas Lindblad</name>
-      <url>https://github.com/guardian/hmac-headers</url>
-    </developer>
-    <developer>
-      <id>emma-p</id>
-      <name>Emmanuelle Poirier</name>
-      <url>https://github.com/guardian/hmac-headers</url>
-    </developer>
-  </developers>)
+licenses := Seq(License.Apache2)
 
-publishMavenStyle := true
-Test / publishArtifact := false
-licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0.html"))
+Test / testOptions +=
+  Tests.Argument(TestFrameworks.ScalaTest, "-u", s"test-results/scala-${scalaVersion.value}", "-o")
 
-publishTo := {
-  val nexus = "https://oss.sonatype.org/"
-  if (isSnapshot.value)
-    Some("snapshots" at nexus + "content/repositories/snapshots")
-  else
-    Some("releases"  at nexus + "service/local/staging/deploy/maven2")
-}
-
-pomIncludeRepository := { _ => false }
-
+// releaseVersion := ReleaseVersion.fromAggregatedAssessedCompatibilityWithLatestRelease().value,
+releaseCrossBuild := true // true if you cross-build the project for multiple Scala versions
 releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,
   inquireVersions,
@@ -60,9 +34,6 @@ releaseProcess := Seq[ReleaseStep](
   setReleaseVersion,
   commitReleaseVersion,
   tagRelease,
-  ReleaseStep(action = Command.process("publishSigned", _)),
   setNextVersion,
-  commitNextVersion,
-  ReleaseStep(action = Command.process("sonatypeReleaseAll", _)),
-  pushChanges
+  commitNextVersion
 )
