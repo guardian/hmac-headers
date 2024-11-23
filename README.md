@@ -36,22 +36,11 @@ sbt +publishLocalSigned
 sbt +publishLocal
 ```
 
-### Get access to publish
-You will need to have access to publish to Maven Central for `com.gu` assets. 
-You can [follow this guide](https://docs.google.com/document/d/1rNXjoZDqZMsQblOVXPAIIOMWuwUKe3KzTCttuqS7AcY/edit#heading=h.651termw35o0) 
-to get access.
+# Publishing a new release
 
-### Update the version
-When you are ready to release, ensure that [`version.sbt`](./version.sbt) is updated and committed in the default branch
-(`main`) with an appropriate version bump following [`semver`](https://semver.org/).
-
-### Tag and release
-
-This will create & push the appropriate version tag for you:
-
-```shell
-sbt release
-````
+This repo uses [`gha-scala-library-release-workflow`](https://github.com/guardian/gha-scala-library-release-workflow)
+to automate publishing releases (both full & preview releases) - see
+[**Making a Release**](https://github.com/guardian/gha-scala-library-release-workflow/blob/main/docs/making-a-release.md).
 
 ## Verifying requests
 
