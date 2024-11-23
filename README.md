@@ -1,4 +1,5 @@
 [![hmac-headers Scala version support](https://index.scala-lang.org/guardian/hmac-headers/hmac-headers/latest-by-scala-version.svg?platform=jvm)](https://index.scala-lang.org/guardian/hmac-headers/hmac-headers)
+[![Release](https://github.com/guardian/hmac-headers/actions/workflows/release.yml/badge.svg)](https://github.com/guardian/hmac-headers/actions/workflows/release.yml)
 
 # Introduction
 
